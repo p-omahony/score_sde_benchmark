@@ -6,3 +6,4 @@ tqdm
 scipy
 pyaml
 wandb
+pytorch-fid
