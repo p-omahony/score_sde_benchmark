@@ -6,6 +6,7 @@ from torchvision.datasets import FashionMNIST
 from tqdm import tqdm
 import functools
 import wandb
+import os
 
 from models import ScoreNet
 from losses import loss_fn
@@ -18,15 +19,15 @@ def main():
     except:
         device = 'cpu'
 
-    sigma =  sweep_configuration['parameters']['sigma']
+    sigma =  wandb.config.sigma
     marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
 
     score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
     score_model = score_model.to(device)
 
-    n_epochs =  sweep_configuration['parameters']['epochs']
-    batch_size =  sweep_configuration['parameters']['batch_size']
-    lr = sweep_configuration['parameters']['lr']
+    n_epochs =  wandb.config.epochs
+    batch_size =  wandb.config.batch_size
+    lr = wandb.config.lr
 
     dataset = FashionMNIST('.', train=True, transform=transforms.ToTensor(), download=True)
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
@@ -53,6 +54,9 @@ def main():
         torch.save(score_model.state_dict(), f'./checkpoints/ckpt_{avg_loss / num_items}_{epoch}_{sigma}.pth')
 
 if __name__ == '__main__':
+    dataset = FashionMNIST('.', train=True, transform=transforms.ToTensor(), download=True)
+    if os.path.exists('./checkpoints')==False:
+      os.mkdir('./checkpoints')
     wandb.login()
     sweep_configuration = {
         'method': 'random',
