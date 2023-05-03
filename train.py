@@ -29,20 +29,15 @@ def main():
         print('You should turn on your GPU environment.')
 
     if args.type != 'exp':
-        cfg = load_config(args.cfg) 
-
+        cfg = load_config(args.cfg)
+    else:
+        cfg = wandb.config 
 
     if args.sde == 'simple':
-        if args.type == 'exp':
-            sigma =  wandb.config.sigma
-        else:
-            sigma = cfg.sigma
+        sigma = cfg.sigma
         sde = simpleSDE(sigma=sigma)
     elif args.sde == 'subvp':
-        if args.type == 'exp':
-            beta_min, beta_max = wandb.config.beta_min, wandb.config.beta_max
-        else:
-            beta_min, beta_max = cfg.beta_min, cfg.beta_max
+        beta_min, beta_max = cfg.beta_min, cfg.beta_max
         sde = subVPSDE(beta_min=beta_min, beta_max=beta_max)
     else:
         print('Please provide an existing SDE.')
@@ -52,14 +47,9 @@ def main():
     score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
     score_model = score_model.to(device)
 
-    if args.type == 'exp':
-        n_epochs =  wandb.config.epochs
-        batch_size =  wandb.config.batch_size
-        lr = wandb.config.lr
-    else:
-        n_epochs =  cfg.epochs
-        batch_size =  cfg.batch_size
-        lr = cfg.lr       
+    n_epochs =  cfg.epochs
+    batch_size =  cfg.batch_size
+    lr = cfg.lr       
 
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
@@ -89,25 +79,29 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--sde', default='simple')
     parser.add_argument('-t', '--type', default='cfg')
+    parser.add_argument('-c', '--cfg', default='./configs/simplesde_cfg.yaml')
     args = parser.parse_args()
 
     dataset = FashionMNIST('.', train=True, transform=transforms.ToTensor(), download=True)
     if os.path.exists('./checkpoints')==False:
       os.mkdir('./checkpoints')
-    wandb.login()
-    sweep_configuration = {
-        'method': 'random',
-        'name': 'sweep',
-        'metric': {
-            'goal': 'minimize', 
-            'name': 'loss'
-            },
-        'parameters': {
-            'sigma': {'values': [15.0, 25.0, 35.0]},
-            'batch_size': {'values': [16, 32, 64]},
-            'epochs': {'values': [50, 60, 80]},
-            'lr': {'max': 0.001, 'min': 0.0001}
+    if args.type =='exp':
+        wandb.login()
+        sweep_configuration = {
+            'method': 'random',
+            'name': 'sweep',
+            'metric': {
+                'goal': 'minimize', 
+                'name': 'loss'
+                },
+            'parameters': {
+                'sigma': {'values': [15.0, 25.0, 35.0]},
+                'batch_size': {'values': [16, 32, 64]},
+                'epochs': {'values': [50, 60, 80]},
+                'lr': {'max': 0.001, 'min': 0.0001}
+            }
         }
-    }
-    sweep_id = wandb.sweep(sweep=sweep_configuration, project="project-name")
-    wandb.agent(sweep_id, function=main, count=6)
+        sweep_id = wandb.sweep(sweep=sweep_configuration, project="project-name")
+        wandb.agent(sweep_id, function=main, count=6)
+    else:
+        main()
