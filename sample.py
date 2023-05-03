@@ -1,5 +1,5 @@
 import torch
-from torchvision.utils import make_grid
+from torchvision.utils import make_grid, save_image
 import matplotlib.pyplot as plt
 import numpy as np
 import functools
@@ -28,12 +28,12 @@ else:
 marginal_prob_std_fn = functools.partial(sde.marginal_prob_std, device=device)
 diffusion_coeff_fn = functools.partial(sde.diffusion_coeff, device=device)
 
-ckpt = torch.load('./checkpoints/best_so_far.pth', map_location=device)
+ckpt = torch.load('./checkpoints/ckpt_0.8065651593402005_24.0_64_0.0001927885538637592.pth', map_location=device)
 score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
 score_model.load_state_dict(ckpt)
 score_model = score_model.to(device)
 
-sample_batch_size = 64 
+sample_batch_size = 128 
 sampler = ode_sampler
 
 samples = sampler(score_model, 
@@ -46,6 +46,10 @@ samples = sampler(score_model,
                   device=device)
 
 samples = samples.clamp(0.0, 1.0)
+c=0
+for sample in samples:
+    save_image(sample, f'./samples/generated/{c}.png')
+    c+=1
 sample_grid = make_grid(samples, nrow=int(np.sqrt(sample_batch_size)))
 
 plt.figure(figsize=(6,6))
