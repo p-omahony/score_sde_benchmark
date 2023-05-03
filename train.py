@@ -7,11 +7,18 @@ from tqdm import tqdm
 import functools
 import wandb
 import os
+import yaml
+from yaml import Loader
 import argparse
 
 from models import ScoreNet
 from losses import loss_fn
 from sdes import simpleSDE, subVPSDE
+
+def load_config(cfg_path):
+    with open(cfg_path, 'r') as ymlfile:
+        cfg = yaml.load(ymlfile, Loader)
+    return cfg
 
 def main():
 
@@ -21,12 +28,21 @@ def main():
         device = 'cpu'
         print('You should turn on your GPU environment.')
 
+    if args.type != 'exp':
+        cfg = load_config(args.cfg) 
+
 
     if args.sde == 'simple':
-        sigma =  wandb.config.sigma
+        if args.type == 'exp':
+            sigma =  wandb.config.sigma
+        else:
+            sigma = cfg.sigma
         sde = simpleSDE(sigma=sigma)
     elif args.sde == 'subvp':
-        beta_min, beta_max = 0.1, 20
+        if args.type == 'exp':
+            beta_min, beta_max = wandb.config.beta_min, wandb.config.beta_max
+        else:
+            beta_min, beta_max = cfg.beta_min, cfg.beta_max
         sde = subVPSDE(beta_min=beta_min, beta_max=beta_max)
     else:
         print('Please provide an existing SDE.')
@@ -36,9 +52,14 @@ def main():
     score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
     score_model = score_model.to(device)
 
-    n_epochs =  wandb.config.epochs
-    batch_size =  wandb.config.batch_size
-    lr = wandb.config.lr
+    if args.type == 'exp':
+        n_epochs =  wandb.config.epochs
+        batch_size =  wandb.config.batch_size
+        lr = wandb.config.lr
+    else:
+        n_epochs =  cfg.epochs
+        batch_size =  cfg.batch_size
+        lr = cfg.lr       
 
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
@@ -56,9 +77,10 @@ def main():
             avg_loss += loss.item() * x.shape[0]
             num_items += x.shape[0]
         # Print the averaged training loss so far.
-        wandb.log({
-            'loss': avg_loss / num_items
-        })
+        if args.type =='exp':
+            wandb.log({
+                'loss': avg_loss / num_items
+            })
         pbar.set_description('Average Loss: {:5f}'.format(avg_loss / num_items))
         # Update the checkpoint after each epoch of training.
         torch.save(score_model.state_dict(), f'./checkpoints/ckpt_{avg_loss / num_items}_{epoch}_{sigma}.pth')
@@ -66,6 +88,7 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--sde', default='simple')
+    parser.add_argument('-t', '--type', default='cfg')
     args = parser.parse_args()
 
     dataset = FashionMNIST('.', train=True, transform=transforms.ToTensor(), download=True)
