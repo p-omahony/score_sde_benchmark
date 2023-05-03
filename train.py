@@ -34,22 +34,22 @@ def main():
         cfg = wandb.config 
 
     if args.sde == 'simple':
-        sigma = cfg.sigma
+        sigma = float(cfg['sigma'])
         sde = simpleSDE(sigma=sigma)
     elif args.sde == 'subvp':
-        beta_min, beta_max = cfg.beta_min, cfg.beta_max
+        beta_min, beta_max = float(cfg['beta_min']), float(cfg['beta_max'])
         sde = subVPSDE(beta_min=beta_min, beta_max=beta_max)
     else:
         print('Please provide an existing SDE.')
 
-    marginal_prob_std_fn = functools.partial(sde.marginal_prob_std, sigma=sigma)
+    marginal_prob_std_fn = functools.partial(sde.marginal_prob_std, device=device)
 
     score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
     score_model = score_model.to(device)
 
-    n_epochs =  cfg.epochs
-    batch_size =  cfg.batch_size
-    lr = cfg.lr       
+    n_epochs =  int(cfg['epochs'])
+    batch_size =  int(cfg['batch_size'])
+    lr = float(cfg['lr'])       
 
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
@@ -73,7 +73,7 @@ def main():
             })
         pbar.set_description('Average Loss: {:5f}'.format(avg_loss / num_items))
         # Update the checkpoint after each epoch of training.
-        torch.save(score_model.state_dict(), f'./checkpoints/ckpt_{avg_loss / num_items}_{epoch}_{sigma}.pth')
+        torch.save(score_model.state_dict(), f'./checkpoints/ckpt.pth') #_{avg_loss / num_items}_{epoch}_{sigma}
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
