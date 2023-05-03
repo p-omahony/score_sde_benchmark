@@ -9,7 +9,7 @@ def Euler_Maruyama_sampler(score_model,
                            num_steps,
                            eps,
                            batch_size,  
-                           device='cuda'):
+                           device='cpu'):
   """Generate samples from score-based models with the Euler-Maruyama solver.
 
   Args:
