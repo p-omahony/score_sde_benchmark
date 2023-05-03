@@ -3,6 +3,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+class EMA(nn.Module):
+  def __init__(self, mu):
+      super(EMA, self).__init__()
+      self.mu = mu
+      self.shadow = {}
+
+  def register(self, name, val):
+      self.shadow[name] = val.clone()
+
+  def forward(self, name, x):
+      assert name in self.shadow
+      new_average = self.mu * x + (1.0 - self.mu) * self.shadow[name]
+      self.shadow[name] = new_average.clone()
+      return new_average
+
 class GaussianFourierProjection(nn.Module):
   """Gaussian random features for encoding time steps."""  
   def __init__(self, embed_dim, scale=30.):

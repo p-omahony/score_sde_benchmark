@@ -11,7 +11,7 @@ import yaml
 from yaml import Loader
 import argparse
 
-from models import ScoreNet
+from models import ScoreNet, EMA
 from losses import loss_fn
 from sdes import simpleSDE, subVPSDE
 
@@ -48,6 +48,12 @@ def main():
     score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
     score_model = score_model.to(device)
 
+    if args.ema == 'true':
+        ema = EMA(0.999)
+        for name, param in score_model.named_parameters():
+            if param.requires_grad:
+                ema.register(name, param.data)
+
     n_epochs =  int(cfg['epochs'])
     batch_size =  int(cfg['batch_size'])
     lr = float(cfg['lr'])       
@@ -65,6 +71,11 @@ def main():
             optimizer.zero_grad()
             loss.backward()    
             optimizer.step()
+            if args.ema == 'true':
+                ema = EMA(0.999)
+                for name, param in score_model.named_parameters():
+                    if param.requires_grad:
+                        ema.register(name, param.data)
             avg_loss += loss.item() * x.shape[0]
             num_items += x.shape[0]
         # Print the averaged training loss so far.
@@ -81,6 +92,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--sde', default='simple')
     parser.add_argument('-t', '--type', default='cfg')
     parser.add_argument('-c', '--cfg', default='./configs/simplesde_cfg.yaml')
+    parser.add_argument('-e', '--ema', defaul='false')
     args = parser.parse_args()
 
     dataset = FashionMNIST('.', train=True, transform=transforms.ToTensor(), download=True)
