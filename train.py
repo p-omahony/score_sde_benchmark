@@ -31,6 +31,7 @@ def main():
     if args.type != 'exp':
         cfg = load_config(args.cfg)
     else:
+        run = wandb.init()
         cfg = wandb.config 
 
     if args.sde == 'simple':
