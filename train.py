@@ -7,10 +7,11 @@ from tqdm import tqdm
 import functools
 import wandb
 import os
+import argparse
 
 from models import ScoreNet
 from losses import loss_fn
-from sde import marginal_prob_std, diffusion_coeff
+from sdes import simpleSDE, subVPSDE
 
 def main():
 
@@ -18,9 +19,19 @@ def main():
         device = 'cuda'
     except:
         device = 'cpu'
+        print('You should turn on your GPU environment.')
 
-    sigma =  wandb.config.sigma
-    marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
+
+    if args.sde == 'simple':
+        sigma =  wandb.config.sigma
+        sde = simpleSDE(sigma=sigma)
+    elif args.sde == 'subvp':
+        beta_min, beta_max = 0.1, 20
+        sde = subVPSDE(beta_min=beta_min, beta_max=beta_max)
+    else:
+        print('Please provide an existing SDE.')
+
+    marginal_prob_std_fn = functools.partial(sde.marginal_prob_std, sigma=sigma)
 
     score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
     score_model = score_model.to(device)
@@ -29,7 +40,6 @@ def main():
     batch_size =  wandb.config.batch_size
     lr = wandb.config.lr
 
-    dataset = FashionMNIST('.', train=True, transform=transforms.ToTensor(), download=True)
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
     optimizer = Adam(score_model.parameters(), lr=lr)
@@ -54,6 +64,10 @@ def main():
         torch.save(score_model.state_dict(), f'./checkpoints/ckpt_{avg_loss / num_items}_{epoch}_{sigma}.pth')
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--sde', default='simple')
+    args = parser.parse_args()
+
     dataset = FashionMNIST('.', train=True, transform=transforms.ToTensor(), download=True)
     if os.path.exists('./checkpoints')==False:
       os.mkdir('./checkpoints')
