@@ -9,7 +9,7 @@ def Euler_Maruyama_sampler(score_model,
                            num_steps,
                            eps,
                            batch_size,  
-                           device='cpu'):
+                           device):
   """Generate samples from score-based models with the Euler-Maruyama solver.
 
   Args:
@@ -33,7 +33,7 @@ def Euler_Maruyama_sampler(score_model,
   step_size = time_steps[0] - time_steps[1]
   x = init_x
   with torch.no_grad():
-    for time_step in tqdm.notebook.tqdm(time_steps):      
+    for time_step in tqdm.tqdm(time_steps):      
       batch_time_step = torch.ones(batch_size, device=device) * time_step
       g = diffusion_coeff(batch_time_step)
       mean_x = x + (g**2)[:, None, None, None] * score_model(x, batch_time_step) * step_size
@@ -48,7 +48,7 @@ def pc_sampler(score_model,
                num_steps, 
                snr,    
                eps,            
-               device='cuda'):
+               device):
   """Generate samples from score-based models with Predictor-Corrector method.
 
   Args:
@@ -98,7 +98,7 @@ def ode_sampler(score_model,
                 atol, 
                 rtol, 
                 eps,
-                device='cuda', 
+                device, 
                 z=None):
   """Generate samples from score-based models with black-box ODE solvers.
 

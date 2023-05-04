@@ -7,11 +7,14 @@ import argparse
 
 from sdes import simpleSDE, subVPSDE
 from models import ScoreNet
-from samplers import ode_sampler
+from samplers import ode_sampler, Euler_Maruyama_sampler, pc_sampler
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-s', '--sde', default='simple')
+parser.add_argument('-e', '--sde', default='simple')
+parser.add_argument('-s', '--sampler', default='ode')
+parser.add_argument('-c', '--checkpoints', default='./checkpoints/best_simple_wo_ema.pth')
+parser.add_argument('-d', '--device', default='cpu')
 args = parser.parse_args()
 
 device = 'cpu'
@@ -25,25 +28,45 @@ elif args.sde == 'subvp':
 else:
     print('Please provide an existing SDE.')
 
-marginal_prob_std_fn = functools.partial(sde.marginal_prob_std, device=device)
-diffusion_coeff_fn = functools.partial(sde.diffusion_coeff, device=device)
+marginal_prob_std_fn = functools.partial(sde.marginal_prob_std, device=args.device)
+diffusion_coeff_fn = functools.partial(sde.diffusion_coeff, device=args.device)
 
-ckpt = torch.load('./checkpoints/ckpt_0.8065651593402005_24.0_64_0.0001927885538637592.pth', map_location=device)
+ckpt = torch.load(args.checkpoints, map_location=device)
 score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
 score_model.load_state_dict(ckpt)
-score_model = score_model.to(device)
+score_model = score_model.to(args.device)
 
 sample_batch_size = 128 
-sampler = ode_sampler
 
-samples = sampler(score_model, 
+if args.sampler == 'ode':
+    sampler = ode_sampler
+    samples = sampler(score_model, 
+                    marginal_prob_std_fn,
+                    diffusion_coeff_fn, 
+                    sample_batch_size, 
+                    atol=1e-5,
+                    rtol=1e-5,
+                    eps=1e-3,
+                    device=args.device)
+elif args.sampler == 'euler':
+    sampler = Euler_Maruyama_sampler
+    sampler(score_model, 
                   marginal_prob_std_fn,
                   diffusion_coeff_fn, 
+                  500,
+                  1e-3,
                   sample_batch_size, 
-                  atol=1e-5,
-                  rtol=1e-5,
-                  eps=1e-3,
                   device=device)
+elif args.sampler == 'pc':
+    sampler = Euler_Maruyama_sampler
+    sampler(score_model, 
+                  marginal_prob_std_fn,
+                  diffusion_coeff_fn, 
+                  sample_batch_size,
+                  500,
+                  snr=0.16,
+                  eps=1e-3, 
+                  device=args.device)
 
 samples = samples.clamp(0.0, 1.0)
 c=0
