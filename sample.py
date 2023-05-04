@@ -50,7 +50,7 @@ if args.sampler == 'ode':
                     device=args.device)
 elif args.sampler == 'euler':
     sampler = Euler_Maruyama_sampler
-    sampler(score_model, 
+    samples = sampler(score_model, 
                   marginal_prob_std_fn,
                   diffusion_coeff_fn, 
                   500,
@@ -59,7 +59,7 @@ elif args.sampler == 'euler':
                   device=device)
 elif args.sampler == 'pc':
     sampler = Euler_Maruyama_sampler
-    sampler(score_model, 
+    samples = sampler(score_model, 
                   marginal_prob_std_fn,
                   diffusion_coeff_fn, 
                   sample_batch_size,
