@@ -36,7 +36,7 @@ score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std
 score_model.load_state_dict(ckpt)
 score_model = score_model.to(args.device)
 
-sample_batch_size = 128 
+sample_batch_size = 1000 
 
 if args.sampler == 'ode':
     sampler = ode_sampler
@@ -56,7 +56,7 @@ elif args.sampler == 'euler':
                   500,
                   1e-3,
                   sample_batch_size, 
-                  device=device)
+                  device=args.device)
 elif args.sampler == 'pc':
     sampler = Euler_Maruyama_sampler
     samples = sampler(score_model, 
